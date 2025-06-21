@@ -59,16 +59,16 @@ def load_model():
     model.eval()
     return model
 
-def generate_digit_images(model, digit, num_images=5):
-    """Generate images of the specified digit"""
+def generate_single_digit_image(model, digit):
+    """Generate a single image of the specified digit"""
     with torch.no_grad():
-        # Create random latent vectors
-        z = torch.randn(num_images, model.latent_dim)
-        digit_labels = torch.full((num_images,), digit, dtype=torch.long)
+        # Create random latent vector for one image
+        z = torch.randn(1, model.latent_dim)
+        digit_label = torch.full((1,), digit, dtype=torch.long)
         
-        # Generate images
-        generated = model.decode(z, digit_labels)
-        generated = generated.view(num_images, 28, 28)
+        # Generate image
+        generated = model.decode(z, digit_label)
+        generated = generated.view(28, 28)
         
     return generated.numpy()
 
@@ -155,39 +155,31 @@ with col2:
             # Load model
             model = load_model()
             
-            # Generate images
-            generated_images = generate_digit_images(model, selected_digit, 5)
-            
-            # Small delay to ensure all images are ready before rendering
-            time.sleep(2)
-            
-            # Success message
-            st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
-            
             # Display all 5 images in a grid
             st.markdown("### Generated Images Grid")
             cols = st.columns(5)
             
-            # Process and display images one by one with small delays
+            # Generate and display images one by one to avoid MediaFileHandler issues
             for i in range(5):
                 with cols[i]:
+                    # Generate one image at a time
+                    img_array = generate_single_digit_image(model, selected_digit)
+                    
                     # Convert numpy array to PIL Image
-                    img_array = generated_images[i]
                     img_normalized = np.clip(img_array * 255, 0, 255).astype(np.uint8)
                     pil_img = Image.fromarray(img_normalized, mode='L')
                     
                     # Resize for better visibility
                     pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
                     
-                    # Display image
+                    # Display image immediately
                     st.image(pil_img_resized, caption=f"Image {i+1}", use_column_width=True)
                     
-                    # Small delay between image renders to avoid concurrency issues
-                    if i < 4:  # Don't sleep after the last image
-                        time.sleep(0.3)
+                    # Small delay between generations to avoid MediaFileHandler conflicts
+                    time.sleep(0.6)
             
-            # Force a small delay and rerun to ensure all images are rendered
-            time.sleep(0.3)
+            # Success message after all images are generated
+            st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
                     
     else:
         st.info("👆 Select a digit and press 'Generate 5 Images' to start")
