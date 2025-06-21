@@ -137,7 +137,7 @@ with col1:
     generate_button = st.button(
         "🎲 Generate 5 Images",
         type="primary",
-        use_column_width=True
+        use_container_width=True
     )
     
     # Additional information
