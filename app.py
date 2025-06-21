@@ -72,6 +72,24 @@ def generate_single_digit_image(model, digit):
         
     return generated.numpy()
 
+def image_to_bytesio(img_array):
+    """Convert numpy array to BytesIO object for st.image()"""
+    # Normalize and convert to uint8
+    img_normalized = np.clip(img_array * 255, 0, 255).astype(np.uint8)
+    
+    # Create PIL image
+    pil_img = Image.fromarray(img_normalized, mode='L')
+    
+    # Resize for better visibility
+    pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
+    
+    # Convert to BytesIO
+    buffer = io.BytesIO()
+    pil_img_resized.save(buffer, format="PNG")
+    buffer.seek(0)
+    
+    return buffer
+
 # Page configuration
 st.set_page_config(
     page_title="MNIST Digit Generator",
@@ -157,26 +175,20 @@ with col2:
             
             # Display all 5 images in a grid
             st.markdown("### Generated Images Grid")
-            cols = st.columns(5)
             
-            # Generate and display images one by one to avoid MediaFileHandler issues
+            # Generate all images first and convert to BytesIO to avoid MediaFileHandler issues
+            image_buffers = []
             for i in range(5):
+                img_array = generate_single_digit_image(model, selected_digit)
+                img_buffer = image_to_bytesio(img_array)
+                image_buffers.append(img_buffer)
+                time.sleep(0.1)  # Small delay between generations
+            
+            # Display images using Streamlit columns with BytesIO objects
+            cols = st.columns(5)
+            for i, img_buffer in enumerate(image_buffers):
                 with cols[i]:
-                    # Generate one image at a time
-                    img_array = generate_single_digit_image(model, selected_digit)
-                    
-                    # Convert numpy array to PIL Image
-                    img_normalized = np.clip(img_array * 255, 0, 255).astype(np.uint8)
-                    pil_img = Image.fromarray(img_normalized, mode='L')
-                    
-                    # Resize for better visibility
-                    pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
-                    
-                    # Display image immediately
-                    st.image(pil_img_resized, caption=f"Image {i+1}", use_column_width=True)
-                    
-                    # Small delay between generations to avoid MediaFileHandler conflicts
-                    time.sleep(0.6)
+                    st.image(img_buffer, caption=f"Image {i+1}", use_column_width=True)
             
             # Success message after all images are generated
             st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
