@@ -71,26 +71,6 @@ def generate_digit_images(model, digit, num_images=5):
         
     return generated.numpy()
 
-def create_image_grid(images, digit):
-    """Create a grid of generated images"""
-    fig, axes = plt.subplots(1, 5, figsize=(12, 3))
-    fig.suptitle(f'Generated Digit {digit} - 5 Variations', fontsize=16, fontweight='bold')
-    
-    for i, (ax, img) in enumerate(zip(axes, images)):
-        ax.imshow(img, cmap='gray', vmin=0, vmax=1)
-        ax.set_title(f'Image {i+1}')
-        ax.axis('off')
-    
-    plt.tight_layout()
-    
-    # Convert to image for display in Streamlit
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-    buf.seek(0)
-    plt.close()
-    
-    return Image.open(buf)
-
 # Page configuration
 st.set_page_config(
     page_title="MNIST Digit Generator",
@@ -177,26 +157,28 @@ with col2:
             # Generate images
             generated_images = generate_digit_images(model, selected_digit, 5)
             
-            # Create and display grid
-            image_grid = create_image_grid(generated_images, selected_digit)
-            st.image(image_grid, use_column_width=True)
+            # Success message
+            st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
             
-            # Show metrics
-            st.success(f"✅ 5 images of digit {selected_digit} generated successfully!")
-            
-            # Show individual images
-            st.markdown("### Individual Images")
+            # Display all 5 images in a grid
+            st.markdown("### Generated Images Grid")
             cols = st.columns(5)
-            for i, (col, img) in enumerate(zip(cols, generated_images)):
-                with col:
-                    # Direct numpy to PIL conversion (alternative approach)
-                    img_normalized = (img * 255).astype('uint8')
-                    img_pil = Image.fromarray(img_normalized, mode='L')
-                    # Resize for better visibility
-                    img_pil = img_pil.resize((128, 128), Image.Resampling.NEAREST)
+            
+            for i in range(5):
+                with cols[i]:
+                    # Convert numpy array to PIL Image
+                    img_array = generated_images[i]
+                    img_normalized = np.clip(img_array * 255, 0, 255).astype(np.uint8)
+                    pil_img = Image.fromarray(img_normalized, mode='L')
                     
-                    st.image(img_pil, caption=f'Image #{i+1}', use_column_width=True)
-                    st.markdown("---")
+                    # Resize for better visibility
+                    pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
+                    
+                    # Display image
+                    st.image(pil_img_resized, caption=f"Image {i+1}", use_container_width=True)
+            
+
+                    
     else:
         st.info("👆 Select a digit and press 'Generate 5 Images' to start")
 
@@ -205,7 +187,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: #666;'>
-        CVAE model trained on MNIST
+        Lautaro Barceló - VAE model trained on MNIST
     </div>
     """, 
     unsafe_allow_html=True
