@@ -189,17 +189,14 @@ with col2:
             cols = st.columns(5)
             for i, (col, img) in enumerate(zip(cols, generated_images)):
                 with col:
-                    fig, ax = plt.subplots(figsize=(2, 2))
-                    ax.imshow(img, cmap='gray', vmin=0, vmax=1)
-                    ax.set_title(f'#{i+1}')
-                    ax.axis('off')
+                    # Direct numpy to PIL conversion (alternative approach)
+                    img_normalized = (img * 255).astype('uint8')
+                    img_pil = Image.fromarray(img_normalized, mode='L')
+                    # Resize for better visibility
+                    img_pil = img_pil.resize((128, 128), Image.Resampling.NEAREST)
                     
-                    buf = io.BytesIO()
-                    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-                    buf.seek(0)
-                    plt.close()
-                    
-                    st.image(Image.open(buf), use_column_width=True)
+                    st.image(img_pil, caption=f'Image #{i+1}', use_column_width=True)
+                    st.markdown("---")
     else:
         st.info("👆 Select a digit and press 'Generate 5 Images' to start")
 
@@ -208,7 +205,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: #666;'>
-        Built with ❤️ using Streamlit | VAE model trained on MNIST
+        CVAE model trained on MNIST
     </div>
     """, 
     unsafe_allow_html=True
