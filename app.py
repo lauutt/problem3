@@ -137,7 +137,7 @@ with col1:
     generate_button = st.button(
         "🎲 Generate 5 Images",
         type="primary",
-        use_container_width=True
+        use_column_width=True
     )
     
     # Additional information
@@ -175,7 +175,7 @@ with col2:
                     pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
                     
                     # Display image
-                    st.image(pil_img_resized, caption=f"Image {i+1}", use_container_width=True)
+                    st.image(pil_img_resized, caption=f"Image {i+1}", use_column_width=True)
             
 
                     
