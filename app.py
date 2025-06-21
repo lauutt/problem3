@@ -44,8 +44,17 @@ class MNISTVAЕ(nn.Module):
 def load_model():
     """Load the trained model"""
     model = MNISTVAЕ(latent_dim=20)
-    # In production, you would load the model state from a file
-    # model.load_state_dict(torch.load('mnist_vae.pth', map_location='cpu'))
+    
+    try:
+        # Load the trained model weights
+        model.load_state_dict(torch.load('mnist_vae.pth', map_location='cpu'))
+        st.success("✅ Model loaded successfully!")
+    except FileNotFoundError:
+        st.warning("⚠️ Model file not found. Using randomly initialized weights for demo.")
+        st.info("Upload 'mnist_vae.pth' to the project root directory.")
+    except Exception as e:
+        st.error(f"❌ Error loading model: {str(e)}")
+    
     model.eval()
     return model
 
@@ -105,6 +114,31 @@ with st.expander("ℹ️ About this application"):
     - 28x28 pixel grayscale images
     - Compatible with original MNIST format
     """)
+
+# Model upload section (if model file is not found)
+try:
+    test_model = MNISTVAЕ(latent_dim=20)
+    torch.load('mnist_vae.pth', map_location='cpu')
+    model_available = True
+except FileNotFoundError:
+    model_available = False
+
+if not model_available:
+    st.warning("🔧 Model Setup Required")
+    st.markdown("Upload your trained model file (`mnist_vae.pth`) to start generating digits:")
+    
+    uploaded_file = st.file_uploader(
+        "Choose your trained model file",
+        type=['pth', 'pt'],
+        help="Upload the .pth file saved from your Colab training"
+    )
+    
+    if uploaded_file is not None:
+        # Save uploaded model
+        with open("mnist_vae.pth", "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        st.success("✅ Model uploaded successfully! Refresh the page to start generating.")
+        st.experimental_rerun()
 
 # Main interface
 col1, col2 = st.columns([1, 3])
