@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 import io
+import time
 
 # Define the same model architecture
 class MNISTVAЕ(nn.Module):
@@ -58,13 +59,8 @@ def load_model():
     model.eval()
     return model
 
-def generate_digit_images(model, digit, num_images=5, seed=None):
+def generate_digit_images(model, digit, num_images=5):
     """Generate images of the specified digit"""
-    # Set seed for reproducible results if provided
-    if seed is not None:
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-    
     with torch.no_grad():
         # Create random latent vectors
         z = torch.randn(num_images, model.latent_dim)
@@ -123,7 +119,7 @@ if not model_available:
         with open("mnist_vae.pth", "wb") as f:
             f.write(uploaded_file.getbuffer())
         st.success("✅ Model uploaded successfully! Refresh the page to start generating.")
-        st.rerun()
+        st.experimental_rerun()
 
 # Main interface
 col1, col2 = st.columns([1, 3])
@@ -131,11 +127,11 @@ col1, col2 = st.columns([1, 3])
 with col1:
     st.markdown("### Selection")
     
-    # Digit selector - Changed index to 1 for default digit 1
+    # Digit selector
     selected_digit = st.selectbox(
         "Choose a digit (0-9):",
         options=list(range(10)),
-        index=1
+        index=0
     )
     
     # Generate button
@@ -152,42 +148,46 @@ with col1:
     st.info("**Images to generate:** 5")
 
 with col2:
-    st.markdown("### Generated Images")  
+    st.markdown("### Generated Images")
+    
     if generate_button:
         with st.spinner(f'Generating 5 images of digit {selected_digit}...'):
-            try:
-                # Load model
-                model = load_model()
-                
-                # Generate images with a fixed seed based on digit for consistency
-                seed = selected_digit * 42 + hash(str(selected_digit)) % 1000
-                generated_images = generate_digit_images(model, selected_digit, 5, seed=seed)
-                
-                # Success message
-                st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
-                
-                # Display all 5 images in a grid
-                st.markdown("### Generated Images Grid")
-                
-                # Process all images first to avoid rendering issues
-                processed_images = []
-                for i in range(5):
+            # Load model
+            model = load_model()
+            
+            # Generate images
+            generated_images = generate_digit_images(model, selected_digit, 5)
+            
+            # Small delay to ensure all images are ready before rendering
+            time.sleep(2)
+            
+            # Success message
+            st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
+            
+            # Display all 5 images in a grid
+            st.markdown("### Generated Images Grid")
+            cols = st.columns(5)
+            
+            # Process and display images one by one with small delays
+            for i in range(5):
+                with cols[i]:
+                    # Convert numpy array to PIL Image
                     img_array = generated_images[i]
                     img_normalized = np.clip(img_array * 255, 0, 255).astype(np.uint8)
                     pil_img = Image.fromarray(img_normalized, mode='L')
+                    
+                    # Resize for better visibility
                     pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
-                    processed_images.append(pil_img_resized)
-                
-                # Now display them all at once
-                cols = st.columns(5)
-                for i, processed_img in enumerate(processed_images):
-                    with cols[i]:
-                        st.image(processed_img, caption=f"Image {i+1}", use_column_width=True)
-                        
-            except Exception as e:
-                st.error(f"❌ Error generating images: {str(e)}")
-                st.info("Try refreshing the page or checking your model file.")
-
+                    
+                    # Display image
+                    st.image(pil_img_resized, caption=f"Image {i+1}", use_column_width=True)
+                    
+                    # Small delay between image renders to avoid concurrency issues
+                    if i < 4:  # Don't sleep after the last image
+                        time.sleep(0.3)
+            
+            # Force a small delay and rerun to ensure all images are rendered
+            time.sleep(0.3)
                     
     else:
         st.info("👆 Select a digit and press 'Generate 5 Images' to start")
