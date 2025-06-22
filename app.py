@@ -72,23 +72,19 @@ def generate_single_digit_image(model, digit):
         
     return generated.numpy()
 
-def image_to_bytesio(img_array):
-    """Convert numpy array to BytesIO object for st.image()"""
-    # Normalize and convert to uint8
-    img_normalized = np.clip(img_array * 255, 0, 255).astype(np.uint8)
+def display_images_with_pyplot(images, digit):
+    """Display images using matplotlib to avoid MediaFileHandler issues"""
+    fig, axes = plt.subplots(1, 5, figsize=(15, 3))
+    fig.suptitle(f'Generated Images of Digit {digit}', fontsize=16, y=1.05)
     
-    # Create PIL image
-    pil_img = Image.fromarray(img_normalized, mode='L')
+    for i, img in enumerate(images):
+        axes[i].imshow(img, cmap='gray', interpolation='nearest')
+        axes[i].set_title(f'Image {i+1}', fontsize=12)
+        axes[i].axis('off')  # Hide axis
     
-    # Resize for better visibility
-    pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
-    
-    # Convert to BytesIO
-    buffer = io.BytesIO()
-    pil_img_resized.save(buffer, format="PNG")
-    buffer.seek(0)
-    
-    return buffer
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.85)
+    return fig
 
 # Page configuration
 st.set_page_config(
@@ -173,22 +169,22 @@ with col2:
             # Load model
             model = load_model()
             
-            # Display all 5 images in a grid
-            st.markdown("### Generated Images Grid")
-            
-            # Generate all images first and convert to BytesIO to avoid MediaFileHandler issues
-            image_buffers = []
+            # Generate all 5 images first
+            generated_images = []
             for i in range(5):
                 img_array = generate_single_digit_image(model, selected_digit)
-                img_buffer = image_to_bytesio(img_array)
-                image_buffers.append(img_buffer)
+                generated_images.append(img_array)
                 time.sleep(0.1)  # Small delay between generations
             
-            # Display images using Streamlit columns with BytesIO objects
-            cols = st.columns(5)
-            for i, img_buffer in enumerate(image_buffers):
-                with cols[i]:
-                    st.image(img_buffer, caption=f"Image {i+1}", use_column_width=True)
+            # Display images using matplotlib to avoid MediaFileHandler issues
+            st.markdown("### Generated Images Grid")
+            fig = display_images_with_pyplot(generated_images, selected_digit)
+            
+            # Use st.pyplot instead of st.image to avoid MediaFileHandler
+            st.pyplot(fig, clear_figure=True)
+            
+            # Close the figure to free memory
+            plt.close(fig)
             
             # Success message after all images are generated
             st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
