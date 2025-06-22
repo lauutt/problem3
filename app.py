@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import io
 import time
+import base64
 
 # Define the same model architecture
 class MNISTVAЕ(nn.Module):
@@ -60,7 +61,7 @@ def load_model():
     return model
 
 def generate_digit_images(model, digit, num_images=5):
-    """Generate images of the specified digit and store as numpy arrays in session state"""
+    """Generate images of the specified digit and store as base64 in session state"""
     with torch.no_grad():
         # Create random latent vectors
         z = torch.randn(num_images, model.latent_dim)
@@ -70,17 +71,23 @@ def generate_digit_images(model, digit, num_images=5):
         generated = model.decode(z, digit_labels)
         generated = generated.view(num_images, 28, 28)
         
-    # Store raw numpy arrays in session state - NO conversion, NO BytesIO, NO base64
-    # Direct numpy arrays avoid MediaFileHandler completely
-    images_numpy = []
+    # Convert to base64 and store in session state - NEVER use st.image()
+    images_b64 = []
     for i in range(num_images):
         img_array = generated[i].numpy()
-        # Normalize to 0-255 and convert to uint8 for st.image
+        # Normalize to 0-255 and convert to uint8
         img_normalized = np.clip(img_array * 255, 0, 255).astype(np.uint8)
-        images_numpy.append(img_normalized)
+        pil_img = Image.fromarray(img_normalized, mode='L')
+        pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        pil_img_resized.save(buffer, format="PNG")
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+        images_b64.append(img_base64)
     
-    # Store raw numpy arrays in session state
-    st.session_state['generated_images'] = images_numpy
+    # Store in session state
+    st.session_state['generated_images'] = images_b64
     st.session_state['current_digit'] = digit
 
 # Page configuration
@@ -178,16 +185,25 @@ with col2:
             # Success message
             st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
     
-    # Display images from session state (avoids MediaFileHandler completely)
+    # Display images from session state - NEVER use st.image(), only HTML
     if st.session_state['generated_images'] is not None:
         st.markdown("### Generated Images Grid")
         
-        # Display numpy arrays directly with st.image - this is the ONLY way to avoid MediaFileHandler
+        # Create HTML grid with base64 images - BYPASSES MediaFileHandler COMPLETELY
         cols = st.columns(5)
-        for i, img_numpy in enumerate(st.session_state['generated_images']):
+        for i, img_b64 in enumerate(st.session_state['generated_images']):
             with cols[i]:
-                # Pass numpy array directly to st.image - NO conversion needed
-                st.image(img_numpy, caption=f"Image {i+1}", use_column_width=True)
+                # HTML img tag with base64 - NO st.image() = NO MediaFileHandler
+                img_html = f"""
+                <div style='text-align: center;'>
+                    <img src='data:image/png;base64,{img_b64}' 
+                         style='width: 120px; height: 120px; border: 2px solid #ddd; border-radius: 8px;'
+                         class='img-fluid'>
+                    <br>
+                    <small style='color: #666; margin-top: 5px; display: block;'>Image {i+1}</small>
+                </div>
+                """
+                st.markdown(img_html, unsafe_allow_html=True)
     else:
         st.info("👆 Select a digit and press 'Generate 5 Images' to start")
 
