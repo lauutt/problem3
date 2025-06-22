@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import io
 import time
+import base64
 
 # Define the same model architecture
 class MNISTVAЕ(nn.Module):
@@ -59,32 +60,34 @@ def load_model():
     model.eval()
     return model
 
-def generate_single_digit_image(model, digit):
-    """Generate a single image of the specified digit"""
+def generate_digit_images(model, digit, num_images=5):
+    """Generate images of the specified digit and store in session state"""
     with torch.no_grad():
-        # Create random latent vector for one image
-        z = torch.randn(1, model.latent_dim)
-        digit_label = torch.full((1,), digit, dtype=torch.long)
+        # Create random latent vectors
+        z = torch.randn(num_images, model.latent_dim)
+        digit_labels = torch.full((num_images,), digit, dtype=torch.long)
         
-        # Generate image
-        generated = model.decode(z, digit_label)
-        generated = generated.view(28, 28)
+        # Generate images
+        generated = model.decode(z, digit_labels)
+        generated = generated.view(num_images, 28, 28)
         
-    return generated.numpy()
-
-def display_images_with_pyplot(images, digit):
-    """Display images using matplotlib to avoid MediaFileHandler issues"""
-    fig, axes = plt.subplots(1, 5, figsize=(15, 3))
-    fig.suptitle(f'Generated Images of Digit {digit}', fontsize=16, y=1.05)
+    # Convert to base64 and store in session state to avoid MediaFileHandler
+    images_b64 = []
+    for i in range(num_images):
+        img_array = generated[i].numpy()
+        img_normalized = np.clip(img_array * 255, 0, 255).astype(np.uint8)
+        pil_img = Image.fromarray(img_normalized, mode='L')
+        pil_img_resized = pil_img.resize((120, 120), Image.Resampling.NEAREST)
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        pil_img_resized.save(buffer, format="PNG")
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+        images_b64.append(img_base64)
     
-    for i, img in enumerate(images):
-        axes[i].imshow(img, cmap='gray', interpolation='nearest')
-        axes[i].set_title(f'Image {i+1}', fontsize=12)
-        axes[i].axis('off')  # Hide axis
-    
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.85)
-    return fig
+    # Store in session state - this avoids MediaFileHandler completely
+    st.session_state['generated_images'] = images_b64
+    st.session_state['current_digit'] = digit
 
 # Page configuration
 st.set_page_config(
@@ -92,6 +95,12 @@ st.set_page_config(
     page_icon="🔢",
     layout="wide"
 )
+
+# Initialize session state
+if 'generated_images' not in st.session_state:
+    st.session_state['generated_images'] = None
+if 'current_digit' not in st.session_state:
+    st.session_state['current_digit'] = None
 
 # Main title
 st.title("🔢 MNIST Handwritten Digit Generator")
@@ -169,26 +178,24 @@ with col2:
             # Load model
             model = load_model()
             
-            # Generate all 5 images first
-            generated_images = []
-            for i in range(5):
-                img_array = generate_single_digit_image(model, selected_digit)
-                generated_images.append(img_array)
-                time.sleep(0.1)  # Small delay between generations
+            # Generate images and store in session state
+            generate_digit_images(model, selected_digit, 5)
             
-            # Display images using matplotlib to avoid MediaFileHandler issues
-            st.markdown("### Generated Images Grid")
-            fig = display_images_with_pyplot(generated_images, selected_digit)
-            
-            # Use st.pyplot instead of st.image to avoid MediaFileHandler
-            st.pyplot(fig, clear_figure=True)
-            
-            # Close the figure to free memory
-            plt.close(fig)
-            
-            # Success message after all images are generated
+            # Success message
             st.success(f"✅ Successfully generated 5 images of digit {selected_digit}!")
-                    
+    
+    # Display images from session state (avoids MediaFileHandler completely)
+    if st.session_state['generated_images'] is not None:
+        st.markdown("### Generated Images Grid")
+        
+        # Convert base64 back to BytesIO and display with st.image
+        cols = st.columns(5)
+        for i, img_b64 in enumerate(st.session_state['generated_images']):
+            with cols[i]:
+                # Convert base64 back to BytesIO for st.image
+                img_bytes = base64.b64decode(img_b64)
+                img_buffer = io.BytesIO(img_bytes)
+                st.image(img_buffer, caption=f"Image {i+1}", use_column_width=True)
     else:
         st.info("👆 Select a digit and press 'Generate 5 Images' to start")
 
